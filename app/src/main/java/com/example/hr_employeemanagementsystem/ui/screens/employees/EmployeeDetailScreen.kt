@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.hr_employeemanagementsystem.data.model.EmployeeEntity
@@ -69,9 +70,24 @@ fun EmployeeDetailScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(emp.displayName, style = MaterialTheme.typography.headlineSmall)
-                Text("${emp.jobTitle} • ${emp.department}", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (emp.photoUri != null) {
+                        coil.compose.AsyncImage(
+                            model = emp.photoUri,
+                            contentDescription = "Profile Photo",
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
+                    Column {
+                        Text(emp.displayName, style = MaterialTheme.typography.headlineSmall)
+                        Text("${emp.jobTitle} • ${emp.department}", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 Text("📧 ${emp.email}", style = MaterialTheme.typography.bodyMedium)
                 Text("📞 ${emp.phone}", style = MaterialTheme.typography.bodyMedium)
                 Text("🏢 ${emp.companyName}", style = MaterialTheme.typography.bodyMedium)

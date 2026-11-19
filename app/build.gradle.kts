@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.example.hr_employeemanagementsystem"
     compileSdk = 35
+    ndkVersion = "28.0.12433566"
 
     defaultConfig {
         applicationId = "com.example.hr_employeemanagementsystem"
@@ -16,6 +17,19 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                arguments("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                cppFlags("-Wl,-z,max-page-size=16384")
+            }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     buildTypes {
@@ -73,6 +87,19 @@ dependencies {
 
     // Gson
     implementation(libs.gson)
+
+    // TensorFlow Lite (Updated for 16 KB page size support)
+    implementation(libs.tensorflowLite)
+    implementation(libs.tensorflowLiteGpu)
+
+    // ML Kit Face Detection
+    implementation(libs.mlkitFaceDetection)
+
+    // Splash Screen
+    implementation(libs.coreSplashScreen)
+    
+    // Coil (Image Loading)
+    implementation(libs.coilCompose)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

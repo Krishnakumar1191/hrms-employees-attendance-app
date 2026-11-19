@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.hr_employeemanagementsystem.data.model.AttendanceEntity
@@ -86,6 +87,38 @@ fun AttendancesScreen(
                     Text("Check-Out: ${log.checkOut ?: "In Progress"}")
                     Text("Worked Hours: ${log.workedHours} hours")
                     Text("Face Verified: Yes")
+                    
+                    if (log.capturedPhotoUri != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Clock-In Photo:", style = MaterialTheme.typography.labelMedium)
+                        coil.compose.AsyncImage(
+                            model = log.capturedPhotoUri,
+                            contentDescription = "Check-in Photo",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
+
+                    if (log.checkInLat != null && log.checkInLng != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Clock-In Location:", style = MaterialTheme.typography.labelMedium)
+                        val position = com.google.android.gms.maps.model.LatLng(log.checkInLat, log.checkInLng)
+                        val cameraState = com.google.maps.android.compose.rememberCameraPositionState {
+                            this.position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(position, 15f)
+                        }
+                        com.google.maps.android.compose.GoogleMap(
+                            modifier = Modifier.fillMaxWidth().height(150.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+                            cameraPositionState = cameraState
+                        ) {
+                            com.google.maps.android.compose.Marker(
+                                state = com.google.maps.android.compose.MarkerState(position = position),
+                                title = "Checked In Here"
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {

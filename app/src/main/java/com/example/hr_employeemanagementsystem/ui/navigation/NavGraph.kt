@@ -1,10 +1,12 @@
 package com.example.hr_employeemanagementsystem.ui.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -58,11 +60,13 @@ fun NavGraph(
     val scope = rememberCoroutineScope()
     var showQuickAccessDialog by remember { mutableStateOf(false) }
 
-    val startDestination = when {
-        !isLoggedIn -> Screen.LoginCredentials.route
-        storedPin.isNullOrBlank() -> Screen.PinSetup.route
-        isAdmin -> Screen.ManagerDashboard.route
-        else -> Screen.KioskHome.route
+    val startDestination = remember(isLoggedIn, storedPin, isAdmin) {
+        when {
+            !isLoggedIn -> Screen.LoginCredentials.route
+            storedPin.isNullOrBlank() -> Screen.PinSetup.route
+            isAdmin -> Screen.ManagerDashboard.route
+            else -> Screen.KioskHome.route
+        }
     }
 
     val isAuthRoute = currentRoute in listOf(
@@ -73,86 +77,28 @@ fun NavGraph(
         Screen.CompanySelect.route
     )
 
-    if (isAuthRoute) {
-        NavHost(navController = navController, startDestination = startDestination) {
-            composable(Screen.LoginCredentials.route) {
-                LoginCredentialsScreen(
-                    authRepository = authRepository,
-                    onLoginSuccess = { admin ->
-                        if (storedPin.isNullOrBlank()) {
-                            navController.navigate(Screen.PinSetup.route)
-                        } else if (admin) {
-                            navController.navigate(Screen.ManagerDashboard.route) { popUpTo(0) }
-                        } else {
-                            navController.navigate(Screen.KioskHome.route) { popUpTo(0) }
-                        }
-                    },
-                    onNavigateOtp = { navController.navigate(Screen.LoginOtp.route) }
-                )
-            }
-            composable(Screen.LoginOtp.route) {
-                LoginOtpScreen(
-                    authRepository = authRepository,
-                    onLoginSuccess = {
-                        if (storedPin.isNullOrBlank()) {
-                            navController.navigate(Screen.PinSetup.route)
-                        } else {
-                            navController.navigate(Screen.CompanySelect.route)
-                        }
-                    },
-                    onNavigateCredentials = { navController.navigate(Screen.LoginCredentials.route) }
-                )
-            }
-            composable(Screen.PinSetup.route) {
-                PinSetupScreen(
-                    authRepository = authRepository,
-                    onPinSet = { navController.navigate(Screen.CompanySelect.route) }
-                )
-            }
-            composable(Screen.PinLogin.route) {
-                PinLoginScreen(
-                    authRepository = authRepository,
-                    onPinSuccess = {
-                        if (isAdmin) {
-                            navController.navigate(Screen.ManagerDashboard.route) { popUpTo(0) }
-                        } else {
-                            navController.navigate(Screen.KioskHome.route) { popUpTo(0) }
-                        }
-                    },
-                    onForceReAuth = { navController.navigate(Screen.LoginCredentials.route) }
-                )
-            }
-            composable(Screen.CompanySelect.route) {
-                CompanySelectScreen(
-                    authRepository = authRepository,
-                    onCompanySelected = {
-                        if (isAdmin) {
-                            navController.navigate(Screen.ManagerDashboard.route) { popUpTo(0) }
-                        } else {
-                            navController.navigate(Screen.KioskHome.route) { popUpTo(0) }
-                        }
-                    }
-                )
-            }
-        }
-    } else {
-        HRSideDrawer(
-            currentRoute = currentRoute,
-            isAdmin = isAdmin,
-            onNavigate = { route ->
-                scope.launch { drawerState.close() }
-                navController.navigate(route)
-            },
-            onLogout = {
-                scope.launch {
-                    authRepository.logout()
-                    drawerState.close()
-                    navController.navigate(Screen.LoginCredentials.route) { popUpTo(0) }
+    HRSideDrawer(
+        currentRoute = currentRoute,
+        isAdmin = isAdmin,
+        drawerState = drawerState,
+        gesturesEnabled = !isAuthRoute,
+        onNavigate = { route ->
+            scope.launch { drawerState.close() }
+            navController.navigate(route)
+        },
+        onLogout = {
+            scope.launch {
+                authRepository.logout()
+                drawerState.close()
+                navController.navigate(Screen.LoginCredentials.route) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
-        ) {
-            Scaffold(
-                topBar = {
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                if (!isAuthRoute) {
                     HRTopBar(
                         title = when (currentRoute) {
                             Screen.ManagerDashboard.route -> "Manager Dashboard"
@@ -174,93 +120,176 @@ fun NavGraph(
                         onProfileClick = { navController.navigate(Screen.Profile.route) }
                     )
                 }
-            ) { padding ->
-                Box(modifier = Modifier.padding(padding)) {
-                    NavHost(navController = navController, startDestination = startDestination) {
-                        composable(Screen.ManagerDashboard.route) {
-                            ManagerDashboardScreen(
-                                leaveRepository = leaveRepository,
-                                wfhRepository = wfhRepository,
-                                employeeRepository = employeeRepository,
-                                onNavigateLeaves = { navController.navigate(Screen.Leaves.route) },
-                                onNavigateWFH = { navController.navigate(Screen.WorkFromHome.route) },
-                                onNavigateEmployees = { navController.navigate(Screen.EmployeeList.route) },
-                                onNavigateKiosk = { navController.navigate(Screen.KioskHome.route) }
-                            )
-                        }
-                        composable(Screen.Leaves.route) {
-                            LeavesScreen(leaveRepository = leaveRepository)
-                        }
-                        composable(Screen.WorkFromHome.route) {
-                            WFHScreen(wfhRepository = wfhRepository)
-                        }
-                        composable(Screen.EmployeeList.route) {
-                            EmployeeListScreen(
-                                employeeRepository = employeeRepository,
-                                onSelectEmployee = { id -> navController.navigate(Screen.EmployeeDetail.createRoute(id)) }
-                            )
-                        }
-                        composable(
-                            route = Screen.EmployeeDetail.route,
-                            arguments = listOf(navArgument("employeeId") { type = NavType.LongType })
-                        ) { backStackEntry ->
-                            val empId = backStackEntry.arguments?.getLong("employeeId") ?: 1L
-                            EmployeeDetailScreen(
-                                employeeId = empId,
-                                employeeRepository = employeeRepository,
-                                locationRepository = locationRepository,
-                                onNavigateEnroll = { id -> navController.navigate(Screen.FaceEnroll.createRoute(id)) }
-                            )
-                        }
-                        composable(
-                            route = Screen.FaceEnroll.route,
-                            arguments = listOf(navArgument("employeeId") { type = NavType.LongType })
-                        ) { backStackEntry ->
-                            val empId = backStackEntry.arguments?.getLong("employeeId") ?: 1L
-                            FaceEnrollScreen(
-                                employeeId = empId,
-                                employeeRepository = employeeRepository,
-                                onEnrollSuccess = { navController.popBackStack() }
-                            )
-                        }
-                        composable(Screen.KioskHome.route) {
-                            KioskHomeScreen(
-                                attendanceRepository = attendanceRepository,
-                                employeeRepository = employeeRepository
-                            )
-                        }
-                        composable(Screen.Attendances.route) {
-                            AttendancesScreen(
-                                attendanceRepository = attendanceRepository,
-                                isAdmin = isAdmin,
-                                currentUserId = currentUserId
-                            )
-                        }
-                        composable(Screen.Events.route) {
-                            EventsScreen(db = db)
-                        }
-                        composable(Screen.Payslips.route) {
-                            PayslipsScreen(db = db, currentUserId = currentUserId)
-                        }
-                        composable(Screen.Settings.route) {
-                            SettingsScreen(
-                                prefs = prefs,
-                                authRepository = authRepository,
-                                onNavigateChangePin = { navController.navigate(Screen.PinSetup.route) },
-                                onLogout = { navController.navigate(Screen.LoginCredentials.route) { popUpTo(0) } }
-                            )
-                        }
-                        composable(Screen.Profile.route) {
-                            ProfileScreen(
-                                db = db,
-                                currentUserId = currentUserId,
-                                username = username,
-                                isAdmin = isAdmin
-                            )
-                        }
-                        composable(Screen.UserManual.route) {
-                            UserManualScreen()
-                        }
+            }
+        ) { padding ->
+            Box(modifier = Modifier.padding(if (isAuthRoute) PaddingValues(0.dp) else padding)) {
+                NavHost(
+                    navController = navController,
+                    startDestination = startDestination
+                ) {
+                    // Auth screens
+                    composable(Screen.LoginCredentials.route) {
+                        LoginCredentialsScreen(
+                            authRepository = authRepository,
+                            onLoginSuccess = { admin ->
+                                val target = if (storedPin.isNullOrBlank()) {
+                                    Screen.PinSetup.route
+                                } else if (admin) {
+                                    Screen.ManagerDashboard.route
+                                } else {
+                                    Screen.KioskHome.route
+                                }
+                                navController.navigate(target) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            },
+                            onNavigateOtp = { navController.navigate(Screen.LoginOtp.route) }
+                        )
+                    }
+                    composable(Screen.LoginOtp.route) {
+                        LoginOtpScreen(
+                            authRepository = authRepository,
+                            onLoginSuccess = {
+                                if (storedPin.isNullOrBlank()) {
+                                    navController.navigate(Screen.PinSetup.route)
+                                } else {
+                                    navController.navigate(Screen.CompanySelect.route)
+                                }
+                            },
+                            onNavigateCredentials = { navController.navigate(Screen.LoginCredentials.route) }
+                        )
+                    }
+                    composable(Screen.PinSetup.route) {
+                        PinSetupScreen(
+                            authRepository = authRepository,
+                            onPinSet = {
+                                navController.navigate(Screen.CompanySelect.route)
+                            }
+                        )
+                    }
+                    composable(Screen.PinLogin.route) {
+                        PinLoginScreen(
+                            authRepository = authRepository,
+                            onPinSuccess = {
+                                val target = if (isAdmin) Screen.ManagerDashboard.route else Screen.KioskHome.route
+                                navController.navigate(target) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            },
+                            onForceReAuth = { navController.navigate(Screen.LoginCredentials.route) }
+                        )
+                    }
+                    composable(Screen.CompanySelect.route) {
+                        CompanySelectScreen(
+                            authRepository = authRepository,
+                            onCompanySelected = {
+                                val target = if (isAdmin) Screen.ManagerDashboard.route else Screen.KioskHome.route
+                                navController.navigate(target) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    // Main App screens
+                    composable(Screen.ManagerDashboard.route) {
+                        ManagerDashboardScreen(
+                            leaveRepository = leaveRepository,
+                            wfhRepository = wfhRepository,
+                            employeeRepository = employeeRepository,
+                            onNavigateLeaves = { navController.navigate(Screen.Leaves.route) },
+                            onNavigateWFH = { navController.navigate(Screen.WorkFromHome.route) },
+                            onNavigateEmployees = { navController.navigate(Screen.EmployeeList.route) },
+                            onNavigateKiosk = { navController.navigate(Screen.KioskHome.route) }
+                        )
+                    }
+                    composable(Screen.Leaves.route) {
+                        LeavesScreen(
+                            leaveRepository = leaveRepository,
+                            currentUserId = currentUserId,
+                            username = username
+                        )
+                    }
+                    composable(Screen.WorkFromHome.route) {
+                        WFHScreen(
+                            wfhRepository = wfhRepository,
+                            currentUserId = currentUserId,
+                            username = username
+                        )
+                    }
+                    composable(Screen.EmployeeList.route) {
+                        EmployeeListScreen(
+                            employeeRepository = employeeRepository,
+                            onSelectEmployee = { id -> navController.navigate(Screen.EmployeeDetail.createRoute(id)) }
+                        )
+                    }
+                    composable(
+                        route = Screen.EmployeeDetail.route,
+                        arguments = listOf(navArgument("employeeId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        val empId = backStackEntry.arguments?.getLong("employeeId") ?: 1L
+                        EmployeeDetailScreen(
+                            employeeId = empId,
+                            employeeRepository = employeeRepository,
+                            locationRepository = locationRepository,
+                            onNavigateEnroll = { id -> navController.navigate(Screen.FaceEnroll.createRoute(id)) }
+                        )
+                    }
+                    composable(
+                        route = Screen.FaceEnroll.route,
+                        arguments = listOf(navArgument("employeeId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        val empId = backStackEntry.arguments?.getLong("employeeId") ?: 1L
+                        FaceEnrollScreen(
+                            employeeId = empId,
+                            employeeRepository = employeeRepository,
+                            onEnrollSuccess = { navController.popBackStack() }
+                        )
+                    }
+                    composable(Screen.KioskHome.route) {
+                        KioskHomeScreen(
+                            attendanceRepository = attendanceRepository,
+                            employeeRepository = employeeRepository
+                        )
+                    }
+                    composable(Screen.Attendances.route) {
+                        AttendancesScreen(
+                            attendanceRepository = attendanceRepository,
+                            isAdmin = isAdmin,
+                            currentUserId = currentUserId
+                        )
+                    }
+                    composable(Screen.Events.route) {
+                        EventsScreen(db = db)
+                    }
+                    composable(Screen.Payslips.route) {
+                        PayslipsScreen(db = db, currentUserId = currentUserId)
+                    }
+                    composable(Screen.Settings.route) {
+                        SettingsScreen(
+                            prefs = prefs,
+                            authRepository = authRepository,
+                            onNavigateChangePin = { navController.navigate(Screen.PinSetup.route) },
+                            onLogout = {
+                                scope.launch {
+                                    authRepository.logout()
+                                    navController.navigate(Screen.LoginCredentials.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    composable(Screen.Profile.route) {
+                        ProfileScreen(
+                            db = db,
+                            currentUserId = currentUserId,
+                            username = username,
+                            isAdmin = isAdmin
+                        )
+                    }
+                    composable(Screen.UserManual.route) {
+                        UserManualScreen()
                     }
                 }
             }

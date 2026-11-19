@@ -20,7 +20,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WFHScreen(
-    wfhRepository: WFHRepository
+    wfhRepository: WFHRepository,
+    currentUserId: Long = 1L,
+    username: String = "User"
 ) {
     val tabs = listOf("Requested", "Approved", "Rejected")
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -113,8 +115,8 @@ fun WFHScreen(
             onSubmit = { start, end, days, reason ->
                 scope.launch {
                     wfhRepository.applyWFH(
-                        employeeId = 2L,
-                        employeeName = "John Doe",
+                        employeeId = currentUserId,
+                        employeeName = username,
                         startDate = start,
                         endDate = end,
                         totalDays = days,

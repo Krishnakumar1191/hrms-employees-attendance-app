@@ -13,5 +13,8 @@ data class AttendanceEntity(
     val workedHours: Double = 0.0,
     val status: String = "Present", // Present, Late, Half Day
     val recognizedFace: Boolean = true,
+    val capturedPhotoUri: String? = null,
+    val checkInLat: Double? = null,
+    val checkInLng: Double? = null,
     val locationTrackLogs: String? = null // JSON array string of route coordinates
 )

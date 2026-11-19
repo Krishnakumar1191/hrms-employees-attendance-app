@@ -30,6 +30,9 @@ interface EmployeeDao {
     @Update
     suspend fun updateEmployee(employee: EmployeeEntity): Int
 
+    @Delete
+    suspend fun deleteEmployee(employee: EmployeeEntity): Int
+
     @Query("UPDATE employees SET isEnrolled = 1, faceDescriptor = :descriptor WHERE id = :employeeId")
     suspend fun updateFaceDescriptor(employeeId: Long, descriptor: String): Int
 }

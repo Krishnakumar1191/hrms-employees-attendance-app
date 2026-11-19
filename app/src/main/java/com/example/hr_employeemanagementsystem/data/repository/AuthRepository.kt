@@ -37,23 +37,22 @@ class AuthRepositoryImpl(
         return if (username.equals("admin", ignoreCase = true) && password == "admin") {
             prefs.saveLoginSession(username = "Admin User", userId = 1L, isAdmin = true)
             Result.success(true)
-        } else if (username.equalsIgnoreCase("john") || username.contains("employee")) {
-            prefs.saveLoginSession(username = "John Doe", userId = 2L, isAdmin = false)
-            Result.success(true)
         } else {
-            // Check in local database
             val employees = employeeDao.getAllEmployees().first()
-            val matched = employees.find { it.email.contains(username, ignoreCase = true) || it.displayName.contains(username, ignoreCase = true) }
+            val matched = employees.find {
+                (it.email.equals(username, ignoreCase = true) ||
+                it.displayName.equals(username, ignoreCase = true) ||
+                it.email.contains(username, ignoreCase = true)) &&
+                it.password == password
+            }
             if (matched != null) {
                 prefs.saveLoginSession(username = matched.displayName, userId = matched.id, isAdmin = matched.isAdmin)
                 Result.success(true)
             } else {
-                Result.failure(Exception("Invalid credentials. Try 'admin' / 'admin' or 'john' / 'john'"))
+                Result.failure(Exception("Invalid credentials. Please check your username and password."))
             }
         }
     }
-
-    private fun String.equalsIgnoreCase(other: String) = this.equals(other, ignoreCase = true)
 
     override suspend fun verifyOtp(identifier: String, otp: String): Result<Boolean> {
         return if (otp == "123456" || otp.length == 6) {

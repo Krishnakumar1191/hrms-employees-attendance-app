@@ -11,17 +11,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.hr_employeemanagementsystem.data.local.db.AppDatabase
-import com.example.hr_employeemanagementsystem.data.local.mock.MockDataInitializer
 import com.example.hr_employeemanagementsystem.data.local.preferences.UserPreferencesRepository
 import com.example.hr_employeemanagementsystem.data.repository.*
 import com.example.hr_employeemanagementsystem.ui.navigation.NavGraph
 import com.example.hr_employeemanagementsystem.ui.theme.HREmployeeManagementSystemTheme
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        try {
+            com.example.hr_employeemanagementsystem.ml.FaceNetModel(this)
+        } catch(e: Exception) {}
+
         enableEdgeToEdge()
 
         setContent {
@@ -36,8 +46,22 @@ class MainActivity : ComponentActivity() {
                 val wfhRepository = remember { WFHRepositoryImpl(db.wfhDao()) }
                 val locationRepository = remember { LocationRepositoryImpl(db.locationLogDao()) }
 
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions()
+                ) { _ ->
+                    // Optionally handle granted/denied states
+                }
+
                 LaunchedEffect(Unit) {
-                    MockDataInitializer(db).seedInitialDataIfEmpty()
+                    val permissionsToRequest = mutableListOf(
+                        Manifest.permission.CAMERA,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    permissionLauncher.launch(permissionsToRequest.toTypedArray())
                 }
 
                 val navController = rememberNavController()

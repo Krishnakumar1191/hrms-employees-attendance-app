@@ -99,9 +99,8 @@ fun LoginCredentialsScreen(
         Spacer(modifier = Modifier.height(24.dp))
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text("Demo Accounts:", style = MaterialTheme.typography.labelLarge)
+                Text("Default Admin Credentials:", style = MaterialTheme.typography.labelLarge)
                 Text("• Admin Role: admin / admin", style = MaterialTheme.typography.bodySmall)
-                Text("• Employee Role: john / john", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

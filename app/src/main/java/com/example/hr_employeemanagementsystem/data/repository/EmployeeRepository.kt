@@ -11,7 +11,9 @@ interface EmployeeRepository {
     fun getTrackedEmployees(): Flow<List<EmployeeEntity>>
     fun getActiveEmployeeCount(): Flow<Int>
     suspend fun saveFaceEnrollment(employeeId: Long, faceDescriptor: String)
+    suspend fun addEmployee(employee: EmployeeEntity): Long
     suspend fun updateEmployee(employee: EmployeeEntity)
+    suspend fun deleteEmployee(employee: EmployeeEntity)
 }
 
 class EmployeeRepositoryImpl(
@@ -32,7 +34,15 @@ class EmployeeRepositoryImpl(
         employeeDao.updateFaceDescriptor(employeeId, faceDescriptor)
     }
 
+    override suspend fun addEmployee(employee: EmployeeEntity): Long {
+        return employeeDao.insertEmployee(employee)
+    }
+
     override suspend fun updateEmployee(employee: EmployeeEntity) {
         employeeDao.updateEmployee(employee)
+    }
+
+    override suspend fun deleteEmployee(employee: EmployeeEntity) {
+        employeeDao.deleteEmployee(employee)
     }
 }

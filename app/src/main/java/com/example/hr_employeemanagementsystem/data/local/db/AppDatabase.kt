@@ -17,7 +17,7 @@ import com.example.hr_employeemanagementsystem.data.model.*
         PayslipEntity::class,
         LocationLogEntity::class
     ],
-    version = 1,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -39,7 +39,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "hr_management_db"
-                ).build()
+                )
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .build()
                 INSTANCE = instance
                 instance
             }

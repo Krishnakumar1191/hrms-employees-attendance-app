@@ -19,6 +19,11 @@ playServicesMaps = "19.0.0"
 gson = "2.11.0"
 materialIconsExtended = "1.7.6"
 ksp = "2.0.21-1.0.28"
+ndk = "28.0.12433566"
+tensorflowLite = "2.17.0"
+splashscreen = "1.0.1"
+mlkitFaceDetection = "16.1.6"
+coil = "2.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -56,6 +61,11 @@ playServicesMaps = { group = "com.google.android.gms", name = "play-services-map
 mapsCompose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+tensorflowLite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflowLiteGpu = { group = "org.tensorflow", name = "tensorflow-lite-gpu", version.ref = "tensorflowLite" }
+coreSplashScreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
+mlkitFaceDetection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFaceDetection" }
+coilCompose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

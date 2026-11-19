@@ -14,17 +14,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.camera.core.ImageAnalysis
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.hr_employeemanagementsystem.data.repository.EmployeeRepository
 import com.example.hr_employeemanagementsystem.ml.EmbeddingUtils
+import com.example.hr_employeemanagementsystem.ml.FaceDetectorManager
+import com.example.hr_employeemanagementsystem.ml.FaceNetModel
 import kotlinx.coroutines.launch
-import kotlin.random.Random
+import java.util.concurrent.Executors
 
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Composable
 fun FaceEnrollScreen(
     employeeId: Long,
@@ -35,6 +44,10 @@ fun FaceEnrollScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var isCapturing by remember { mutableStateOf(false) }
+    var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
+    var message by remember { mutableStateOf("Keep your face inside frame. Hold still for few seconds until scan is complete.") }
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    val faceNet = remember { FaceNetModel(context) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
@@ -50,24 +63,174 @@ fun FaceEnrollScreen(
                     val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                        val imageAnalyzer = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also { analysis ->
+                                analysis.setAnalyzer(
+                                    cameraExecutor,
+                                    FaceDetectorManager(
+                                        onFaceDetected = { boundingBox, bitmap ->
+                                            scope.launch { message = "Face detected! Tap capture to save." }
+                                            if (isCapturing) {
+                                                isCapturing = false
+                                                try {
+                                                    val liveEmbedding = faceNet.getFaceEmbedding(bitmap, boundingBox)
+                                                    val descriptorString = EmbeddingUtils.floatArrayToString(liveEmbedding)
+
+                                                    val file = java.io.File(context.filesDir, "face_${employeeId}_${System.currentTimeMillis()}.jpg")
+                                                    java.io.FileOutputStream(file).use { out ->
+                                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                                    }
+
+                                                    scope.launch {
+                                                        employeeRepository.saveFaceEnrollment(employeeId, descriptorString)
+                                                        val emp = employeeRepository.getEmployeeById(employeeId)
+                                                        if (emp != null) {
+                                                            employeeRepository.updateEmployee(emp.copy(photoUri = file.absolutePath))
+                                                        }
+
+                                                        Toast.makeText(context, "Face Enrolled Successfully!", Toast.LENGTH_SHORT).show()
+                                                        onEnrollSuccess()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    android.util.Log.e("FaceEnroll", "Error capturing face", e)
+                                                    scope.launch {
+                                                        Toast.makeText(context, "Failed to capture face", Toast.LENGTH_SHORT).show()
+                                                        message = "Keep your face inside frame. Hold still for few seconds until scan is complete."
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onNoFaceDetected = {
+                                            if (isCapturing) {
+                                                isCapturing = false
+                                                scope.launch {
+                                                    message = "No face detected. Keep still."
+                                                }
+                                            } else {
+                                                scope.launch {
+                                                    message = "No face detected. Keep still."
+                                                }
+                                            }
+                                        },
+                                        onError = {
+                                            isCapturing = false
+                                        }
+                                    )
+                                )
+                            }
+                        cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
                 }, ContextCompat.getMainExecutor(ctx))
 
+                previewViewRef = previewView
                 previewView
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Oval Face Guide Frame
-        Box(
-            modifier = Modifier
-                .size(260.dp)
-                .align(Alignment.Center)
-                .border(4.dp, Color.Green, CircleShape)
-        )
+        // Semi-transparent overlay with a clear circular cutout
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            val canvasWidth = size.width
+            val canvasHeight = size.height
+            
+            // Calculate center and radius for the cutout
+            val centerX = canvasWidth / 2
+            val centerY = canvasHeight / 2 - 150f // slightly higher
+            val radius = canvasWidth * 0.45f // Made circle much larger
+            
+            // Draw the dark semi-transparent background
+            with(drawContext.canvas.nativeCanvas) {
+                val checkPoint = saveLayer(null, null)
+                
+                // Dark background
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    size = androidx.compose.ui.geometry.Size(canvasWidth, canvasHeight)
+                )
+                
+                // Clear the circle area
+                drawCircle(
+                    color = Color.Transparent,
+                    radius = radius,
+                    center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                    blendMode = BlendMode.Clear
+                )
+                
+                // Draw the guiding lines/corners
+                val lineLength = 80f // Longer corner brackets
+                val strokeWidth = 10f // Thicker corner brackets
+                val cornerColor = Color(0xFF64B5F6)
+            
+            // Top Left
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY - radius + lineLength),
+                end = androidx.compose.ui.geometry.Offset(centerX - radius, centerY - radius),
+                strokeWidth = strokeWidth
+            )
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY - radius),
+                end = androidx.compose.ui.geometry.Offset(centerX - radius + lineLength, centerY - radius),
+                strokeWidth = strokeWidth
+            )
+            
+            // Top Right
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX + radius - lineLength, centerY - radius),
+                end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY - radius),
+                strokeWidth = strokeWidth
+            )
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX + radius, centerY - radius),
+                end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY - radius + lineLength),
+                strokeWidth = strokeWidth
+            )
+            
+            // Bottom Left
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY + radius - lineLength),
+                end = androidx.compose.ui.geometry.Offset(centerX - radius, centerY + radius),
+                strokeWidth = strokeWidth
+            )
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY + radius),
+                end = androidx.compose.ui.geometry.Offset(centerX - radius + lineLength, centerY + radius),
+                strokeWidth = strokeWidth
+            )
+            
+            // Bottom Right
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX + radius - lineLength, centerY + radius),
+                end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY + radius),
+                strokeWidth = strokeWidth
+            )
+            drawLine(
+                color = cornerColor,
+                start = androidx.compose.ui.geometry.Offset(centerX + radius, centerY + radius),
+                end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY + radius - lineLength),
+                strokeWidth = strokeWidth
+            )
+            // Center horizontal guide line
+            drawLine(
+                color = cornerColor.copy(alpha = 0.5f),
+                start = androidx.compose.ui.geometry.Offset(centerX - radius - 20f, centerY),
+                end = androidx.compose.ui.geometry.Offset(centerX + radius + 20f, centerY),
+                strokeWidth = 3f
+            )
+
+            restoreToCount(checkPoint)
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -76,21 +239,19 @@ fun FaceEnrollScreen(
                 .align(Alignment.BottomCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Align face inside green oval frame", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                message,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
                     isCapturing = true
-                    scope.launch {
-                        // Generate a 192-dim normalized feature descriptor vector
-                        val descriptorFloats = FloatArray(192) { Random.nextFloat() }
-                        val descriptorString = EmbeddingUtils.floatArrayToString(descriptorFloats)
-
-                        employeeRepository.saveFaceEnrollment(employeeId, descriptorString)
-                        Toast.makeText(context, "Face Enrolled Successfully!", Toast.LENGTH_SHORT).show()
-                        onEnrollSuccess()
-                    }
+                    message = "Detecting face..."
                 },
                 enabled = !isCapturing,
                 modifier = Modifier.fillMaxWidth()

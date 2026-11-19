@@ -11,7 +11,7 @@ interface AttendanceRepository {
     fun getAttendancesForEmployee(employeeId: Long): Flow<List<AttendanceEntity>>
     suspend fun getActiveAttendance(employeeId: Long): AttendanceEntity?
     fun getTodayAttendanceCount(datePrefix: String): Flow<Int>
-    suspend fun clockIn(employeeId: Long, employeeName: String): AttendanceEntity
+    suspend fun clockIn(employeeId: Long, employeeName: String, photoUri: String?, lat: Double?, lng: Double?): AttendanceEntity
     suspend fun clockOut(activeAttendance: AttendanceEntity): AttendanceEntity
 }
 
@@ -32,7 +32,7 @@ class AttendanceRepositoryImpl(
     override fun getTodayAttendanceCount(datePrefix: String): Flow<Int> =
         attendanceDao.getTodayAttendanceCount(datePrefix)
 
-    override suspend fun clockIn(employeeId: Long, employeeName: String): AttendanceEntity {
+    override suspend fun clockIn(employeeId: Long, employeeName: String, photoUri: String?, lat: Double?, lng: Double?): AttendanceEntity {
         val now = dateFormat.format(Date())
         val newAttendance = AttendanceEntity(
             employeeId = employeeId,
@@ -41,7 +41,10 @@ class AttendanceRepositoryImpl(
             checkOut = null,
             workedHours = 0.0,
             status = "Present",
-            recognizedFace = true
+            recognizedFace = true,
+            capturedPhotoUri = photoUri,
+            checkInLat = lat,
+            checkInLng = lng
         )
         val id = attendanceDao.insertAttendance(newAttendance)
         return newAttendance.copy(id = id)

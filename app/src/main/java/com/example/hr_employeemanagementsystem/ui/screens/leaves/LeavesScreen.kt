@@ -20,7 +20,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeavesScreen(
-    leaveRepository: LeaveRepository
+    leaveRepository: LeaveRepository,
+    currentUserId: Long = 1L,
+    username: String = "User"
 ) {
     val tabs = listOf("Requested", "Approved", "Rejected", "Revoked")
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -115,8 +117,8 @@ fun LeavesScreen(
             onSubmit = { type, start, end, days, reason ->
                 scope.launch {
                     leaveRepository.applyLeave(
-                        employeeId = 2L,
-                        employeeName = "John Doe",
+                        employeeId = currentUserId,
+                        employeeName = username,
                         leaveType = type,
                         startDate = start,
                         endDate = end,
