@@ -6,21 +6,20 @@ class FaceMatcher {
 
     /**
      * Matches a live face embedding strictly against enrolled employee face descriptors in Room DB.
-     * Ensures zero cross-matching between different employees (e.g. Mani vs Raj).
+     * Uses a high confidence threshold (0.60) to prevent false triggers or matching wrong persons.
      */
     fun matchFace(liveEmbedding: FloatArray, enrolledEmployees: List<EmployeeEntity>): EmployeeEntity? {
         if (enrolledEmployees.isEmpty()) return null
 
         var bestMatch: EmployeeEntity? = null
-        // Strict threshold to ensure distinct facial feature separation between different employees
-        var highestScore = 0.45f
+        var highestScore = 0.60f // High confidence threshold to eliminate false positives
 
         for (employee in enrolledEmployees) {
             val descriptorStr = employee.faceDescriptor ?: continue
             val enrolledEmbedding = EmbeddingUtils.stringToFloatArray(descriptorStr) ?: continue
 
             val similarity = EmbeddingUtils.calculateCosineSimilarity(liveEmbedding, enrolledEmbedding)
-            android.util.Log.d("FaceMatcher", "Comparing live face with [${employee.displayName}] -> Similarity Score: $similarity")
+            android.util.Log.d("FaceMatcher", "Comparing face with [${employee.displayName}] -> Similarity Score: $similarity")
 
             if (similarity > highestScore) {
                 highestScore = similarity
@@ -29,9 +28,9 @@ class FaceMatcher {
         }
 
         if (bestMatch != null) {
-            android.util.Log.d("FaceMatcher", "Successfully matched employee: ${bestMatch.displayName} with score: $highestScore")
+            android.util.Log.d("FaceMatcher", "Confirmed Match: ${bestMatch.displayName} with score $highestScore")
         } else {
-            android.util.Log.d("FaceMatcher", "No enrolled employee matched the live face above threshold.")
+            android.util.Log.d("FaceMatcher", "Face did not meet high-confidence threshold (0.60).")
         }
 
         return bestMatch

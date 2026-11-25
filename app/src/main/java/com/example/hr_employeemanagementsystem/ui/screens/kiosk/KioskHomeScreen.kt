@@ -155,7 +155,37 @@ fun KioskHomeScreen(
                                                             android.util.Log.e("FaceKiosk", "Error saving face crop photo", e)
                                                         }
 
-                                                        attendanceRepository.clockIn(matchedEmp.id, matchedEmp.displayName, photoUri, 12.9716, 77.5946)
+                                                        // Fetch real device location dynamically using high accuracy
+                                                        val (lat, lng) = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+                                                            try {
+                                                                val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                                                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                                                                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                                                    
+                                                                    val request = com.google.android.gms.location.CurrentLocationRequest.Builder()
+                                                                        .setPriority(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY)
+                                                                        .setMaxUpdateAgeMillis(10000)
+                                                                        .build()
+
+                                                                    fusedLocationClient.getCurrentLocation(request, null).addOnSuccessListener { location ->
+                                                                        if (location != null) {
+                                                                            continuation.resumeWith(Result.success(Pair(location.latitude, location.longitude)))
+                                                                        } else {
+                                                                            // Fallback to Coimbatore coordinates (11.0168, 76.9558)
+                                                                            continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                        }
+                                                                    }.addOnFailureListener {
+                                                                        continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                    }
+                                                                } else {
+                                                                    continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                            }
+                                                        }
+
+                                                        attendanceRepository.clockIn(matchedEmp.id, matchedEmp.displayName, photoUri, lat, lng)
                                                         if (matchedEmp.trackEmployee) {
                                                             LocationTrackingService.startTracking(context, matchedEmp.id)
                                                         }
@@ -169,7 +199,36 @@ fun KioskHomeScreen(
                                                         if (currentTime - checkInTime < cooldownMs) {
                                                             recognizedMessage = "⏳ Wait 1 min to Check Out, ${matchedEmp.displayName}"
                                                         } else {
-                                                            attendanceRepository.clockOut(activeAttendance)
+                                                            // Fetch real device location dynamically for check-out
+                                                            val (outLat, outLng) = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+                                                                try {
+                                                                    val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                                                    if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                                                                        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                                                        
+                                                                        val request = com.google.android.gms.location.CurrentLocationRequest.Builder()
+                                                                            .setPriority(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY)
+                                                                            .setMaxUpdateAgeMillis(10000)
+                                                                            .build()
+
+                                                                        fusedLocationClient.getCurrentLocation(request, null).addOnSuccessListener { location ->
+                                                                            if (location != null) {
+                                                                                continuation.resumeWith(Result.success(Pair(location.latitude, location.longitude)))
+                                                                            } else {
+                                                                                continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                            }
+                                                                        }.addOnFailureListener {
+                                                                            continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                        }
+                                                                    } else {
+                                                                        continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                    }
+                                                                } catch (e: Exception) {
+                                                                    continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
+                                                                }
+                                                            }
+
+                                                            attendanceRepository.clockOut(activeAttendance, outLat, outLng)
                                                             if (matchedEmp.trackEmployee) {
                                                                 LocationTrackingService.stopTracking(context)
                                                             }

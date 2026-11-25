@@ -21,6 +21,9 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(attendance: AttendanceEntity): Long
 
+    @Query("UPDATE attendances SET checkOut = :checkOut, checkOutLat = :lat, checkOutLng = :lng, status = 'Completed', workedHours = :workedHours WHERE id = :id")
+    suspend fun clockOut(id: Long, checkOut: String, lat: Double?, lng: Double?, workedHours: Double): Int
+
     @Update
     suspend fun updateAttendance(attendance: AttendanceEntity): Int
 }

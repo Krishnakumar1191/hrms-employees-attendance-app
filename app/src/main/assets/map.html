@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #e5e3df; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const startLat = parseFloat(urlParams.get('startLat')) || 11.0168;
+        const startLng = parseFloat(urlParams.get('startLng')) || 76.9558;
+        const endLat = parseFloat(urlParams.get('endLat')) || startLat;
+        const endLng = parseFloat(urlParams.get('endLng')) || startLng;
+
+        var map = L.map('map', {zoomControl: true, attributionControl: false}).setView([startLat, startLng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        var latlngs = [
+            [startLat, startLng],
+            [endLat, endLng]
+        ];
+
+        var polyline = L.polyline(latlngs, {color: 'blue', weight: 6}).addTo(map);
+
+        L.marker([startLat, startLng]).addTo(map)
+            .bindPopup('Check-In Start');
+
+        if (endLat !== startLat || endLng !== startLng) {
+            L.marker([endLat, endLng]).addTo(map)
+                .bindPopup('Check-Out End');
+        }
+
+        map.fitBounds(polyline.getBounds(), {padding: [30, 30]});
+    </script>
+</body>
+</html>

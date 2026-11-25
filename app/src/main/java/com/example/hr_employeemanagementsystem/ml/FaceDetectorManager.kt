@@ -14,13 +14,13 @@ class FaceDetectorManager(
     private val onError: (Exception) -> Unit
 ) : ImageAnalysis.Analyzer {
 
-    // Strict and accurate human face detector to ignore chairs and inanimate objects
+    // Ultra-strict human face detector requiring open eyes and forward-facing head angles
     private val detector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .setMinFaceSize(0.15f)
+            .setMinFaceSize(0.20f) // Face must occupy at least 20% of frame
             .build()
     )
 
@@ -33,11 +33,17 @@ class FaceDetectorManager(
             
             detector.process(image)
                 .addOnSuccessListener { faces ->
-                    // Filter out chairs and non-human objects by validating eye features and landmarks
+                    // Rigorous validation to ensure it is a real front-facing human face, not an object or shadow
                     val validFaces = faces.filter { face ->
-                        val rightEye = face.rightEyeOpenProbability ?: 0.5f
-                        val leftEye = face.leftEyeOpenProbability ?: 0.5f
-                        face.allLandmarks.isNotEmpty() && (rightEye > 0.05f || leftEye > 0.05f)
+                        val rightEye = face.rightEyeOpenProbability ?: -1f
+                        val leftEye = face.leftEyeOpenProbability ?: -1f
+                        val headAngleY = face.headEulerAngleY // Yaw (left/right turn)
+                        val headAngleZ = face.headEulerAngleZ // Roll (tilt)
+
+                        // Must have valid eye probabilities and be facing relatively forward
+                        rightEye > 0.15f && leftEye > 0.15f &&
+                        Math.abs(headAngleY) < 35f && Math.abs(headAngleZ) < 35f &&
+                        face.allLandmarks.isNotEmpty()
                     }
 
                     if (validFaces.isNotEmpty()) {

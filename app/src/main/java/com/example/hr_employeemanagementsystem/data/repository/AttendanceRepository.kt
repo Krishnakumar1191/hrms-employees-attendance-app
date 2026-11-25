@@ -12,7 +12,7 @@ interface AttendanceRepository {
     suspend fun getActiveAttendance(employeeId: Long): AttendanceEntity?
     fun getTodayAttendanceCount(datePrefix: String): Flow<Int>
     suspend fun clockIn(employeeId: Long, employeeName: String, photoUri: String?, lat: Double?, lng: Double?): AttendanceEntity
-    suspend fun clockOut(activeAttendance: AttendanceEntity): AttendanceEntity
+    suspend fun clockOut(activeAttendance: AttendanceEntity, lat: Double?, lng: Double?): AttendanceEntity
 }
 
 class AttendanceRepositoryImpl(
@@ -50,18 +50,19 @@ class AttendanceRepositoryImpl(
         return newAttendance.copy(id = id)
     }
 
-    override suspend fun clockOut(activeAttendance: AttendanceEntity): AttendanceEntity {
+    override suspend fun clockOut(activeAttendance: AttendanceEntity, lat: Double?, lng: Double?): AttendanceEntity {
         val now = dateFormat.format(Date())
         val checkInDate = try { dateFormat.parse(activeAttendance.checkIn) } catch (e: Exception) { Date() }
         val checkOutDate = Date()
         val diffMillis = checkOutDate.time - (checkInDate?.time ?: checkOutDate.time)
         val workedHours = String.format(Locale.US, "%.2f", diffMillis / (1000.0 * 60 * 60)).toDouble()
 
-        val updated = activeAttendance.copy(
+        attendanceDao.clockOut(activeAttendance.id, now, lat, lng, workedHours)
+        return activeAttendance.copy(
             checkOut = now,
+            checkOutLat = lat,
+            checkOutLng = lng,
             workedHours = workedHours
         )
-        attendanceDao.updateAttendance(updated)
-        return updated
     }
 }

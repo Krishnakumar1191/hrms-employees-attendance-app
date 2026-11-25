@@ -255,6 +255,7 @@ fun NavGraph(
                     composable(Screen.Attendances.route) {
                         AttendancesScreen(
                             attendanceRepository = attendanceRepository,
+                            locationRepository = locationRepository,
                             isAdmin = isAdmin,
                             currentUserId = currentUserId
                         )

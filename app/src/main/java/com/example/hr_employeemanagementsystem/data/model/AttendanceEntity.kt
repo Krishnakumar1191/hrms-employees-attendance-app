@@ -16,5 +16,7 @@ data class AttendanceEntity(
     val capturedPhotoUri: String? = null,
     val checkInLat: Double? = null,
     val checkInLng: Double? = null,
+    val checkOutLat: Double? = null,
+    val checkOutLng: Double? = null,
     val locationTrackLogs: String? = null // JSON array string of route coordinates
 )
