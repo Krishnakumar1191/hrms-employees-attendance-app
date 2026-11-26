@@ -29,6 +29,7 @@ import com.example.hr_employeemanagementsystem.ui.screens.events.EventsScreen
 import com.example.hr_employeemanagementsystem.ui.screens.kiosk.KioskHomeScreen
 import com.example.hr_employeemanagementsystem.ui.screens.leaves.LeavesScreen
 import com.example.hr_employeemanagementsystem.ui.screens.payslip.PayslipsScreen
+import com.example.hr_employeemanagementsystem.ui.screens.reports.ReportsScreen
 import com.example.hr_employeemanagementsystem.ui.screens.settings.ProfileScreen
 import com.example.hr_employeemanagementsystem.ui.screens.settings.SettingsScreen
 import com.example.hr_employeemanagementsystem.ui.screens.settings.UserManualScreen
@@ -74,7 +75,8 @@ fun NavGraph(
         Screen.LoginOtp.route,
         Screen.PinSetup.route,
         Screen.PinLogin.route,
-        Screen.CompanySelect.route
+        Screen.CompanySelect.route,
+        Screen.CompanyRegister.route
     )
 
     HRSideDrawer(
@@ -101,18 +103,19 @@ fun NavGraph(
                 if (!isAuthRoute) {
                     HRTopBar(
                         title = when (currentRoute) {
-                            Screen.ManagerDashboard.route -> "Manager Dashboard"
+                            Screen.ManagerDashboard.route -> "Admin Dashboard"
                             Screen.Leaves.route -> "Leave Requests"
                             Screen.WorkFromHome.route -> "Work From Home"
                             Screen.EmployeeList.route -> "Employee Directory"
                             Screen.KioskHome.route -> "Face Attendance Kiosk"
                             Screen.Attendances.route -> "Attendance History"
+                            Screen.Reports.route -> "Attendance Reports"
                             Screen.Events.route -> "Events & Holidays"
                             Screen.Payslips.route -> "Payslips"
                             Screen.Settings.route -> "Settings"
                             Screen.Profile.route -> "User Profile"
                             Screen.UserManual.route -> "User Guide"
-                            else -> "HR Management"
+                            else -> "$username Details"
                         },
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onQuickAccessClick = { showQuickAccessDialog = true },
@@ -143,7 +146,20 @@ fun NavGraph(
                                     popUpTo(0) { inclusive = true }
                                 }
                             },
-                            onNavigateOtp = { navController.navigate(Screen.LoginOtp.route) }
+                            onNavigateOtp = { navController.navigate(Screen.LoginOtp.route) },
+                            onNavigateRegister = { navController.navigate(Screen.CompanyRegister.route) }
+                        )
+                    }
+                    composable(Screen.CompanyRegister.route) {
+                        CompanyRegisterScreen(
+                            context = androidx.compose.ui.platform.LocalContext.current,
+                            prefs = prefs,
+                            onRegisterSuccess = {
+                                navController.navigate(Screen.LoginCredentials.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            },
+                            onNavigateLogin = { navController.navigate(Screen.LoginCredentials.route) }
                         )
                     }
                     composable(Screen.LoginOtp.route) {
@@ -194,6 +210,7 @@ fun NavGraph(
                     // Main App screens
                     composable(Screen.ManagerDashboard.route) {
                         ManagerDashboardScreen(
+                            username = username,
                             leaveRepository = leaveRepository,
                             wfhRepository = wfhRepository,
                             employeeRepository = employeeRepository,
@@ -220,6 +237,7 @@ fun NavGraph(
                     composable(Screen.EmployeeList.route) {
                         EmployeeListScreen(
                             employeeRepository = employeeRepository,
+                            departmentDao = db.departmentDao(),
                             onSelectEmployee = { id -> navController.navigate(Screen.EmployeeDetail.createRoute(id)) }
                         )
                     }
@@ -231,6 +249,7 @@ fun NavGraph(
                         EmployeeDetailScreen(
                             employeeId = empId,
                             employeeRepository = employeeRepository,
+                            attendanceRepository = attendanceRepository,
                             locationRepository = locationRepository,
                             onNavigateEnroll = { id -> navController.navigate(Screen.FaceEnroll.createRoute(id)) }
                         )
@@ -255,6 +274,8 @@ fun NavGraph(
                     composable(Screen.Attendances.route) {
                         AttendancesScreen(
                             attendanceRepository = attendanceRepository,
+                            leaveRepository = leaveRepository,
+                            wfhRepository = wfhRepository,
                             locationRepository = locationRepository,
                             isAdmin = isAdmin,
                             currentUserId = currentUserId
@@ -262,6 +283,13 @@ fun NavGraph(
                     }
                     composable(Screen.Events.route) {
                         EventsScreen(db = db)
+                    }
+                    composable(Screen.Reports.route) {
+                        ReportsScreen(
+                            attendanceRepository = attendanceRepository,
+                            leaveRepository = leaveRepository,
+                            wfhRepository = wfhRepository
+                        )
                     }
                     composable(Screen.Payslips.route) {
                         PayslipsScreen(db = db, currentUserId = currentUserId)

@@ -20,9 +20,11 @@ import com.example.hr_employeemanagementsystem.data.repository.EmployeeRepositor
 import com.example.hr_employeemanagementsystem.data.repository.LeaveRepository
 import com.example.hr_employeemanagementsystem.data.repository.WFHRepository
 import com.example.hr_employeemanagementsystem.ui.components.MetricCard
+import java.util.Calendar
 
 @Composable
 fun ManagerDashboardScreen(
+    username: String = "User",
     leaveRepository: LeaveRepository,
     wfhRepository: WFHRepository,
     employeeRepository: EmployeeRepository,
@@ -34,6 +36,13 @@ fun ManagerDashboardScreen(
     val pendingLeaves by leaveRepository.getPendingLeaveCount().collectAsState(initial = 0)
     val pendingWFH by wfhRepository.getPendingWFHCount().collectAsState(initial = 0)
     val activeEmployees by employeeRepository.getActiveEmployeeCount().collectAsState(initial = 0)
+
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val greeting = when {
+        hour < 12 -> "Good Morning"
+        hour < 17 -> "Good Afternoon"
+        else -> "Good Evening"
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -57,7 +66,7 @@ fun ManagerDashboardScreen(
             ) {
                 Column {
                     Text(
-                        text = "Good Morning, Manager!",
+                        text = "$greeting, $username!",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
                         fontWeight = FontWeight.Bold

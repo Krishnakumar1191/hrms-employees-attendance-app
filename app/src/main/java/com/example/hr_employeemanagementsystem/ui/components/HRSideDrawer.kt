@@ -45,7 +45,7 @@ fun HRSideDrawer(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (isAdmin) "Manager Workspace" else "Employee Workspace",
+                        text = if (isAdmin) "Admin Workspace" else "Employee Workspace",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -60,7 +60,7 @@ fun HRSideDrawer(
                 ) {
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
-                        label = { Text("Manager Dashboard") },
+                        label = { Text("Admin Dashboard") },
                         selected = (currentRoute == "manager_dashboard"),
                         onClick = { onNavigate("manager_dashboard") },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -103,6 +103,14 @@ fun HRSideDrawer(
                         label = { Text("Attendance Logs") },
                         selected = (currentRoute == "attendances"),
                         onClick = { onNavigate("attendances") },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Assessment, contentDescription = null) },
+                        label = { Text("Attendance Reports") },
+                        selected = (currentRoute == "reports"),
+                        onClick = { onNavigate("reports") },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
 

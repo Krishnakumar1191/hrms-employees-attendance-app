@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.hr_employeemanagementsystem.data.local.dao.DepartmentDao
+import com.example.hr_employeemanagementsystem.data.model.DepartmentEntity
 import com.example.hr_employeemanagementsystem.data.model.EmployeeEntity
 import com.example.hr_employeemanagementsystem.data.repository.EmployeeRepository
 import kotlinx.coroutines.launch
@@ -28,6 +30,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun EmployeeListScreen(
     employeeRepository: EmployeeRepository,
+    departmentDao: DepartmentDao,
     onSelectEmployee: (employeeId: Long) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -138,7 +141,6 @@ fun EmployeeListScreen(
                                         }
                                     }
 
-                                    // Actions
                                     Column {
                                         IconButton(onClick = { editingEmployee = emp }) {
                                             Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
@@ -160,6 +162,7 @@ fun EmployeeListScreen(
         val isEdit = editingEmployee != null
         AddEditEmployeeDialog(
             initialEmployee = editingEmployee,
+            departmentDao = departmentDao,
             onDismiss = {
                 showAddDialog = false
                 editingEmployee = null
@@ -205,25 +208,36 @@ fun EmployeeListScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditEmployeeDialog(
     initialEmployee: EmployeeEntity?,
+    departmentDao: DepartmentDao,
     onDismiss: () -> Unit,
     onSave: (EmployeeEntity) -> Unit
 ) {
+    val departments by departmentDao.getAllDepartments().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+
     var displayName by remember { mutableStateOf(initialEmployee?.displayName ?: "") }
     var email by remember { mutableStateOf(initialEmployee?.email ?: "") }
     var phone by remember { mutableStateOf(initialEmployee?.phone ?: "") }
     var jobTitle by remember { mutableStateOf(initialEmployee?.jobTitle ?: "") }
-    var department by remember { mutableStateOf(initialEmployee?.department ?: "") }
+    var department by remember { mutableStateOf(initialEmployee?.department ?: departments.firstOrNull()?.departmentName ?: "Executive") }
     var trackEmployee by remember { mutableStateOf(initialEmployee?.trackEmployee ?: false) }
     var isAdmin by remember { mutableStateOf(initialEmployee?.isAdmin ?: false) }
     
     var password by remember { mutableStateOf(initialEmployee?.password ?: "") }
     var confirmPassword by remember { mutableStateOf(initialEmployee?.password ?: "") }
 
+    var deptExpanded by remember { mutableStateOf(false) }
+    var showAddDeptDialog by remember { mutableStateOf(false) }
+    var newDeptName by remember { mutableStateOf("") }
+
+    var nameError by remember { mutableStateOf<String?>(null) }
     var emailError by remember { mutableStateOf<String?>(null) }
     var phoneError by remember { mutableStateOf<String?>(null) }
+    var jobError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -236,9 +250,11 @@ fun AddEditEmployeeDialog(
             ) {
                 OutlinedTextField(
                     value = displayName,
-                    onValueChange = { displayName = it },
+                    onValueChange = { displayName = it; nameError = null },
                     label = { Text("Full Name") },
-                    singleLine = true
+                    singleLine = true,
+                    isError = nameError != null,
+                    supportingText = { nameError?.let { Text(it) } }
                 )
                 OutlinedTextField(
                     value = email,
@@ -258,16 +274,50 @@ fun AddEditEmployeeDialog(
                 )
                 OutlinedTextField(
                     value = jobTitle,
-                    onValueChange = { jobTitle = it },
+                    onValueChange = { jobTitle = it; jobError = null },
                     label = { Text("Job Title") },
-                    singleLine = true
+                    singleLine = true,
+                    isError = jobError != null,
+                    supportingText = { jobError?.let { Text(it) } }
                 )
-                OutlinedTextField(
-                    value = department,
-                    onValueChange = { department = it },
-                    label = { Text("Department") },
-                    singleLine = true
-                )
+
+                // Dynamic Department Dropdown with CRUD Support
+                ExposedDropdownMenuBox(
+                    expanded = deptExpanded,
+                    onExpandedChange = { deptExpanded = !deptExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = department,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Department") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = deptExpanded,
+                        onDismissRequest = { deptExpanded = false }
+                    ) {
+                        departments.forEach { dept ->
+                            DropdownMenuItem(
+                                text = { Text(dept.departmentName) },
+                                onClick = {
+                                    department = dept.departmentName
+                                    deptExpanded = false
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("+ Add New Department...", color = MaterialTheme.colorScheme.primary) },
+                            onClick = {
+                                deptExpanded = false
+                                showAddDeptDialog = true
+                            }
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; passwordError = null },
@@ -300,27 +350,52 @@ fun AddEditEmployeeDialog(
                 onClick = {
                     var hasError = false
                     
+                    if (displayName.isBlank()) {
+                        nameError = "Full name is required"
+                        hasError = true
+                    } else {
+                        nameError = null
+                    }
+
                     val emailRegex = "^[A-Za-z0-9+_.-]+@(.+)\$".toRegex()
                     if (!email.matches(emailRegex)) {
                         emailError = "Invalid email format"
                         hasError = true
+                    } else {
+                        emailError = null
                     }
+
                     if (phone.length < 10) {
-                        phoneError = "Phone number too short"
+                        phoneError = "Valid phone number (10+ digits) required"
+                        hasError = true
+                    } else {
+                        phoneError = null
+                    }
+
+                    if (jobTitle.isBlank()) {
+                        jobError = "Job title is required"
+                        hasError = true
+                    } else {
+                        jobError = null
+                    }
+
+                    if (department.isBlank()) {
                         hasError = true
                     }
-                    
+
                     if (initialEmployee == null || password.isNotEmpty()) {
                         if (password.length < 6) {
-                            passwordError = "Password must be at least 6 chars"
+                            passwordError = "Password must be at least 6 characters"
                             hasError = true
                         } else if (password != confirmPassword) {
                             passwordError = "Passwords do not match"
                             hasError = true
+                        } else {
+                            passwordError = null
                         }
                     }
 
-                    if (!hasError && displayName.isNotBlank() && email.isNotBlank()) {
+                    if (!hasError) {
                         val finalPassword = if (password.isNotBlank()) password else initialEmployee?.password ?: ""
                         val emp = initialEmployee?.copy(
                             displayName = displayName,
@@ -338,8 +413,8 @@ fun AddEditEmployeeDialog(
                             password = finalPassword,
                             jobTitle = jobTitle,
                             department = department,
-                            companyId = 1L, // Default for now
-                            companyName = "Headquarters", // Default
+                            companyId = 1L,
+                            companyName = "Headquarters",
                             trackEmployee = trackEmployee,
                             isAdmin = isAdmin
                         )
@@ -354,4 +429,37 @@ fun AddEditEmployeeDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+
+    if (showAddDeptDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDeptDialog = false },
+            title = { Text("Add New Department") },
+            text = {
+                OutlinedTextField(
+                    value = newDeptName,
+                    onValueChange = { newDeptName = it },
+                    label = { Text("Department Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newDeptName.isNotBlank()) {
+                        scope.launch {
+                            departmentDao.insertDepartment(DepartmentEntity(newDeptName.trim()))
+                            department = newDeptName.trim()
+                            newDeptName = ""
+                            showAddDeptDialog = false
+                        }
+                    }
+                }) {
+                    Text("Add")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDeptDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 }

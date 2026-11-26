@@ -1,7 +1,5 @@
 package com.example.hr_employeemanagementsystem.ui.screens.employees
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,25 +13,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.hr_employeemanagementsystem.data.model.EmployeeEntity
+import com.example.hr_employeemanagementsystem.data.repository.AttendanceRepository
 import com.example.hr_employeemanagementsystem.data.repository.EmployeeRepository
 import com.example.hr_employeemanagementsystem.data.repository.LocationRepository
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
 
 @Composable
 fun EmployeeDetailScreen(
     employeeId: Long,
     employeeRepository: EmployeeRepository,
+    attendanceRepository: AttendanceRepository,
     locationRepository: LocationRepository,
     onNavigateEnroll: (employeeId: Long) -> Unit
 ) {
     val context = LocalContext.current
     var employee by remember { mutableStateOf<EmployeeEntity?>(null) }
-    val locationLogs by locationRepository.getLocationLogsForEmployee(employeeId).collectAsState(initial = emptyList())
 
     LaunchedEffect(employeeId) {
         employee = employeeRepository.getEmployeeById(employeeId)
@@ -45,17 +38,6 @@ fun EmployeeDetailScreen(
             CircularProgressIndicator()
         }
         return
-    }
-
-    val defaultPos = LatLng(12.9716, 77.5946) // Default LatLng (e.g. Bangalore)
-    val routePoints = if (locationLogs.isNotEmpty()) {
-        locationLogs.map { LatLng(it.latitude, it.longitude) }
-    } else {
-        listOf(defaultPos, LatLng(12.9750, 77.5990))
-    }
-
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(routePoints.last(), 14f)
     }
 
     Column(
@@ -88,9 +70,9 @@ fun EmployeeDetailScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("📧 ${emp.email}", style = MaterialTheme.typography.bodyMedium)
-                Text("📞 ${emp.phone}", style = MaterialTheme.typography.bodyMedium)
-                Text("🏢 ${emp.companyName}", style = MaterialTheme.typography.bodyMedium)
+                Text("📧 ${emp.email}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text("📞 ${emp.phone}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text("🏢 ${emp.companyName}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
         }
 
@@ -110,44 +92,6 @@ fun EmployeeDetailScreen(
                     Icon(Icons.Default.CameraFront, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (emp.isEnrolled) "Update Face Enrollment" else "Enroll Face Photo")
-                }
-            }
-        }
-
-        if (emp.trackEmployee) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Live GPS Shift Tracking Map", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                        GoogleMap(
-                            modifier = Modifier.fillMaxSize(),
-                            cameraPositionState = cameraPositionState
-                        ) {
-                            Polyline(points = routePoints, color = androidx.compose.ui.graphics.Color.Blue, width = 8f)
-                            Marker(state = com.google.maps.android.compose.MarkerState(position = routePoints.first()), title = "Check-in Start")
-                            Marker(state = com.google.maps.android.compose.MarkerState(position = routePoints.last()), title = "Current Position")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            val lastPos = routePoints.last()
-                            val gmmIntentUri = Uri.parse("google.navigation:q=${lastPos.latitude},${lastPos.longitude}&mode=w")
-                            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
-                                setPackage("com.google.android.apps.maps")
-                            }
-                            context.startActivity(mapIntent)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Directions, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Route in Google Maps App")
-                    }
                 }
             }
         }

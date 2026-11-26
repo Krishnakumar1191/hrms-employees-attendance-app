@@ -14,7 +14,8 @@ import kotlinx.coroutines.launch
 fun LoginCredentialsScreen(
     authRepository: AuthRepository,
     onLoginSuccess: (isAdmin: Boolean) -> Unit,
-    onNavigateOtp: () -> Unit
+    onNavigateOtp: () -> Unit,
+    onNavigateRegister: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -94,6 +95,15 @@ fun LoginCredentialsScreen(
 
         TextButton(onClick = onNavigateOtp) {
             Text("Log in with OTP / Mobile")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onNavigateRegister,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Register New Organization / Company")
         }
 
         Spacer(modifier = Modifier.height(24.dp))

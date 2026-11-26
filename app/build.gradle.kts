@@ -84,6 +84,8 @@ dependencies {
     implementation(libs.playServicesLocation)
     implementation(libs.playServicesMaps)
     implementation(libs.mapsCompose)
+    implementation("org.maplibre.gl:android-sdk:13.8.0")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Gson
     implementation(libs.gson)

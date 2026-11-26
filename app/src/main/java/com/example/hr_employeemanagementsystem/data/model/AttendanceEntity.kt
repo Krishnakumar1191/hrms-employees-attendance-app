@@ -14,6 +14,7 @@ data class AttendanceEntity(
     val status: String = "Present", // Present, Late, Half Day
     val recognizedFace: Boolean = true,
     val capturedPhotoUri: String? = null,
+    val employeePhotoUri: String? = null,
     val checkInLat: Double? = null,
     val checkInLng: Double? = null,
     val checkOutLat: Double? = null,

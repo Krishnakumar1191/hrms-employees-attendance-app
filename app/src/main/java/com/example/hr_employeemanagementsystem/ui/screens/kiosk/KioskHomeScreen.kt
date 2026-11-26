@@ -185,7 +185,7 @@ fun KioskHomeScreen(
                                                             }
                                                         }
 
-                                                        attendanceRepository.clockIn(matchedEmp.id, matchedEmp.displayName, photoUri, lat, lng)
+                                                        attendanceRepository.clockIn(matchedEmp.id, matchedEmp.displayName, photoUri, matchedEmp.photoUri, lat, lng)
                                                         if (matchedEmp.trackEmployee) {
                                                             LocationTrackingService.startTracking(context, matchedEmp.id)
                                                         }

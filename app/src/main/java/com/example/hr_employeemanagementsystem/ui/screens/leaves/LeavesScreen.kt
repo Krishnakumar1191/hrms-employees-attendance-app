@@ -3,12 +3,14 @@ package com.example.hr_employeemanagementsystem.ui.screens.leaves
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -132,27 +134,84 @@ fun LeavesScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplyLeaveDialog(
     onDismiss: () -> Unit,
     onSubmit: (type: String, start: String, end: String, days: Double, reason: String) -> Unit
 ) {
+    val today = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()) }
     var type by remember { mutableStateOf("Paid Leave") }
-    var startDate by remember { mutableStateOf("2026-11-01") }
-    var endDate by remember { mutableStateOf("2026-11-02") }
-    var days by remember { mutableStateOf("2.0") }
+    var startDate by remember { mutableStateOf(today) }
+    var endDate by remember { mutableStateOf(today) }
+    var durationType by remember { mutableStateOf("Full Day") }
+    var days by remember { mutableStateOf("1.0") }
     var reason by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
+    val updateDays = { s: String, e: String, dtype: String ->
+        if (dtype.contains("Half")) {
+            days = "0.5"
+            endDate = s
+        } else {
+            try {
+                val format = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val d1 = format.parse(s)
+                val d2 = format.parse(e)
+                if (d1 != null && d2 != null) {
+                    val diff = d2.time - d1.time
+                    val calculated = (diff / (1000.0 * 60 * 60 * 24)).toLong() + 1L
+                    if (calculated > 0) days = calculated.toDouble().toString() else days = "1.0"
+                }
+            } catch (_: Exception) {
+                days = "1.0"
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Apply For Leave") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = type, onValueChange = { type = it }, label = { Text("Leave Type") })
-                OutlinedTextField(value = startDate, onValueChange = { startDate = it }, label = { Text("Start Date (YYYY-MM-DD)") })
-                OutlinedTextField(value = endDate, onValueChange = { endDate = it }, label = { Text("End Date (YYYY-MM-DD)") })
-                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Total Days") })
-                OutlinedTextField(value = reason, onValueChange = { reason = it }, label = { Text("Reason") })
+                OutlinedTextField(value = type, onValueChange = { type = it }, label = { Text("Leave Type") }, modifier = Modifier.fillMaxWidth())
+                
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = durationType,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Duration") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf("Full Day", "First Half (0.5)", "Second Half (0.5)").forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    durationType = option
+                                    updateDays(startDate, endDate, option)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                DatePickerField(label = "Start Date", date = startDate, onDateSelected = { startDate = it; updateDays(it, endDate, durationType) })
+                if (!durationType.contains("Half")) {
+                    DatePickerField(label = "End Date", date = endDate, onDateSelected = { endDate = it; updateDays(startDate, it, durationType) })
+                }
+                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Total Days") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = reason, onValueChange = { reason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -164,4 +223,55 @@ fun ApplyLeaveDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerField(
+    label: String,
+    date: String,
+    onDateSelected: (String) -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+
+    OutlinedTextField(
+        value = date,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        trailingIcon = {
+            IconButton(onClick = { showDialog = true }) {
+                Icon(Icons.Default.DateRange, contentDescription = "Select Date")
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showDialog = true }
+    )
+
+    if (showDialog) {
+        DatePickerDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                        val formattedDate = formatter.format(java.util.Date(millis))
+                        onDateSelected(formattedDate)
+                    }
+                    showDialog = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }

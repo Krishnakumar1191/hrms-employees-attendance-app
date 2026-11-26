@@ -7,6 +7,7 @@ sealed class Screen(val route: String) {
     object PinSetup : Screen("pin_setup")
     object PinLogin : Screen("pin_login")
     object CompanySelect : Screen("company_select")
+    object CompanyRegister : Screen("company_register")
     object ManagerDashboard : Screen("manager_dashboard")
     object Leaves : Screen("leaves")
     object WorkFromHome : Screen("work_from_home")
@@ -23,5 +24,6 @@ sealed class Screen(val route: String) {
     object Payslips : Screen("payslips")
     object Settings : Screen("settings")
     object Profile : Screen("profile")
+    object Reports : Screen("reports")
     object UserManual : Screen("user_manual")
 }

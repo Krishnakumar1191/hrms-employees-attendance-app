@@ -9,6 +9,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import android.Manifest
@@ -30,14 +32,17 @@ class MainActivity : ComponentActivity() {
         
         try {
             com.example.hr_employeemanagementsystem.ml.FaceNetModel(this)
+            org.osmdroid.config.Configuration.getInstance().load(this, this.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE))
+            org.osmdroid.config.Configuration.getInstance().userAgentValue = "HREmployeeManagementSystem/1.0"
         } catch(e: Exception) {}
 
         enableEdgeToEdge()
 
         setContent {
             HREmployeeManagementSystemTheme {
-                val db = remember { AppDatabase.getDatabase(applicationContext) }
                 val prefs = remember { UserPreferencesRepository(applicationContext) }
+                val selectedCompany by prefs.selectedCompanyFlow.collectAsState(initial = "default")
+                val db = remember(selectedCompany) { AppDatabase.getDatabase(applicationContext, selectedCompany) }
 
                 val authRepository = remember { AuthRepositoryImpl(prefs, db.employeeDao()) }
                 val employeeRepository = remember { EmployeeRepositoryImpl(db.employeeDao()) }
