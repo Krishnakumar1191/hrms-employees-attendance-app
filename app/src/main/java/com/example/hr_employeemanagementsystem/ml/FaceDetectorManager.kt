@@ -17,10 +17,10 @@ class FaceDetectorManager(
     // Ultra-strict human face detector requiring open eyes and forward-facing head angles
     private val detector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .setMinFaceSize(0.20f) // Face must occupy at least 20% of frame
+            .setMinFaceSize(0.20f)
             .build()
     )
 

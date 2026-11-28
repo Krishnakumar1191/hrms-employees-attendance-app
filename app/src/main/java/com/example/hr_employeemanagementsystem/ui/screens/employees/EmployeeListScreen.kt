@@ -6,12 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.hr_employeemanagementsystem.data.local.dao.DepartmentDao
 import com.example.hr_employeemanagementsystem.data.model.DepartmentEntity
@@ -69,7 +65,7 @@ fun EmployeeListScreen(
                 label = { Text("Search Employees...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             )
 
             TabRow(selectedTabIndex = selectedTab) {
@@ -79,7 +75,7 @@ fun EmployeeListScreen(
 
             if (filteredList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No employees match search.", style = MaterialTheme.typography.bodyMedium)
+                    Text("No employees match search.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(
@@ -117,8 +113,8 @@ fun EmployeeListScreen(
                                     }
                                     Spacer(modifier = Modifier.width(16.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(emp.displayName, style = MaterialTheme.typography.titleMedium)
-                                        Text("${emp.jobTitle} • ${emp.department}", style = MaterialTheme.typography.bodySmall)
+                                        Text(emp.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Text("${emp.jobTitle} • ${emp.department}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -240,195 +236,238 @@ fun AddEditEmployeeDialog(
     var jobError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (initialEmployee == null) "Add Employee" else "Edit Employee") },
-        text = {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it; nameError = null },
-                    label = { Text("Full Name") },
-                    singleLine = true,
-                    isError = nameError != null,
-                    supportingText = { nameError?.let { Text(it) } }
-                )
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it; emailError = null },
-                    label = { Text("Email Address") },
-                    singleLine = true,
-                    isError = emailError != null,
-                    supportingText = { emailError?.let { Text(it) } }
-                )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it; phoneError = null },
-                    label = { Text("Phone Number") },
-                    singleLine = true,
-                    isError = phoneError != null,
-                    supportingText = { phoneError?.let { Text(it) } }
-                )
-                OutlinedTextField(
-                    value = jobTitle,
-                    onValueChange = { jobTitle = it; jobError = null },
-                    label = { Text("Job Title") },
-                    singleLine = true,
-                    isError = jobError != null,
-                    supportingText = { jobError?.let { Text(it) } }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (initialEmployee == null) "Add New Employee" else "Edit Employee",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
 
-                // Dynamic Department Dropdown with CRUD Support
-                ExposedDropdownMenuBox(
-                    expanded = deptExpanded,
-                    onExpandedChange = { deptExpanded = !deptExpanded },
-                    modifier = Modifier.fillMaxWidth()
+                HorizontalDivider()
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedTextField(
-                        value = department,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Department") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        value = displayName,
+                        onValueChange = { displayName = it; nameError = null },
+                        label = { Text("Full Name") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = nameError != null,
+                        supportingText = { nameError?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    ExposedDropdownMenu(
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it; emailError = null },
+                        label = { Text("Email Address") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = emailError != null,
+                        supportingText = { emailError?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it; phoneError = null },
+                        label = { Text("Phone Number") },
+                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = phoneError != null,
+                        supportingText = { phoneError?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = jobTitle,
+                        onValueChange = { jobTitle = it; jobError = null },
+                        label = { Text("Job Title") },
+                        leadingIcon = { Icon(Icons.Default.Work, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = jobError != null,
+                        supportingText = { jobError?.let { Text(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenuBox(
                         expanded = deptExpanded,
-                        onDismissRequest = { deptExpanded = false }
+                        onExpandedChange = { deptExpanded = !deptExpanded },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        departments.forEach { dept ->
+                        OutlinedTextField(
+                            value = department,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Department") },
+                            leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded) },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = deptExpanded,
+                            onDismissRequest = { deptExpanded = false }
+                        ) {
+                            departments.forEach { dept ->
+                                DropdownMenuItem(
+                                    text = { Text(dept.departmentName) },
+                                    onClick = {
+                                        department = dept.departmentName
+                                        deptExpanded = false
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
-                                text = { Text(dept.departmentName) },
+                                text = { Text("+ Add New Department...", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
                                 onClick = {
-                                    department = dept.departmentName
                                     deptExpanded = false
+                                    showAddDeptDialog = true
                                 }
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text("+ Add New Department...", color = MaterialTheme.colorScheme.primary) },
-                            onClick = {
-                                deptExpanded = false
-                                showAddDeptDialog = true
+                    }
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it; passwordError = null },
+                        label = { Text(if (initialEmployee == null) "Password" else "New Password (optional)") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = passwordError != null,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it; passwordError = null },
+                        label = { Text("Confirm Password") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = passwordError != null,
+                        supportingText = { passwordError?.let { Text(it) } },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = trackEmployee, onCheckedChange = { trackEmployee = it })
+                        Text("Enable GPS Tracking", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = isAdmin, onCheckedChange = { isAdmin = it })
+                        Text("Has Admin Privileges", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            var hasError = false
+
+                            if (displayName.isBlank()) { nameError = "Full name is required"; hasError = true } else { nameError = null }
+                            val emailRegex = "^[A-Za-z0-9+_.-]+@(.+)\$".toRegex()
+                            if (!email.matches(emailRegex)) { emailError = "Invalid email format"; hasError = true } else { emailError = null }
+                            if (phone.length < 10) { phoneError = "Valid phone number required"; hasError = true } else { phoneError = null }
+                            if (jobTitle.isBlank()) { jobError = "Job title is required"; hasError = true } else { jobError = null }
+
+                            if (initialEmployee == null || password.isNotEmpty()) {
+                                if (password.length < 6) {
+                                    passwordError = "Password must be at least 6 characters"
+                                    hasError = true
+                                } else if (password != confirmPassword) {
+                                    passwordError = "Passwords do not match"
+                                    hasError = true
+                                } else {
+                                    passwordError = null
+                                }
                             }
-                        )
-                    }
-                }
 
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it; passwordError = null },
-                    label = { Text(if (initialEmployee == null) "Password" else "New Password (optional)") },
-                    singleLine = true,
-                    isError = passwordError != null,
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
-                )
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it; passwordError = null },
-                    label = { Text("Confirm Password") },
-                    singleLine = true,
-                    isError = passwordError != null,
-                    supportingText = { passwordError?.let { Text(it) } },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = trackEmployee, onCheckedChange = { trackEmployee = it })
-                    Text("Enable GPS Tracking")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isAdmin, onCheckedChange = { isAdmin = it })
-                    Text("Has Admin Privileges")
+                            if (!hasError) {
+                                val finalPassword = if (password.isNotBlank()) password else initialEmployee?.password ?: ""
+                                val emp = initialEmployee?.copy(
+                                    displayName = displayName,
+                                    email = email,
+                                    phone = phone,
+                                    password = finalPassword,
+                                    jobTitle = jobTitle,
+                                    department = department,
+                                    trackEmployee = trackEmployee,
+                                    isAdmin = isAdmin
+                                ) ?: EmployeeEntity(
+                                    displayName = displayName,
+                                    email = email,
+                                    phone = phone,
+                                    password = finalPassword,
+                                    jobTitle = jobTitle,
+                                    department = department,
+                                    companyId = 1L,
+                                    companyName = "Headquarters",
+                                    trackEmployee = trackEmployee,
+                                    isAdmin = isAdmin
+                                )
+                                onSave(emp)
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Save Employee", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    var hasError = false
-                    
-                    if (displayName.isBlank()) {
-                        nameError = "Full name is required"
-                        hasError = true
-                    } else {
-                        nameError = null
-                    }
-
-                    val emailRegex = "^[A-Za-z0-9+_.-]+@(.+)\$".toRegex()
-                    if (!email.matches(emailRegex)) {
-                        emailError = "Invalid email format"
-                        hasError = true
-                    } else {
-                        emailError = null
-                    }
-
-                    if (phone.length < 10) {
-                        phoneError = "Valid phone number (10+ digits) required"
-                        hasError = true
-                    } else {
-                        phoneError = null
-                    }
-
-                    if (jobTitle.isBlank()) {
-                        jobError = "Job title is required"
-                        hasError = true
-                    } else {
-                        jobError = null
-                    }
-
-                    if (department.isBlank()) {
-                        hasError = true
-                    }
-
-                    if (initialEmployee == null || password.isNotEmpty()) {
-                        if (password.length < 6) {
-                            passwordError = "Password must be at least 6 characters"
-                            hasError = true
-                        } else if (password != confirmPassword) {
-                            passwordError = "Passwords do not match"
-                            hasError = true
-                        } else {
-                            passwordError = null
-                        }
-                    }
-
-                    if (!hasError) {
-                        val finalPassword = if (password.isNotBlank()) password else initialEmployee?.password ?: ""
-                        val emp = initialEmployee?.copy(
-                            displayName = displayName,
-                            email = email,
-                            phone = phone,
-                            password = finalPassword,
-                            jobTitle = jobTitle,
-                            department = department,
-                            trackEmployee = trackEmployee,
-                            isAdmin = isAdmin
-                        ) ?: EmployeeEntity(
-                            displayName = displayName,
-                            email = email,
-                            phone = phone,
-                            password = finalPassword,
-                            jobTitle = jobTitle,
-                            department = department,
-                            companyId = 1L,
-                            companyName = "Headquarters",
-                            trackEmployee = trackEmployee,
-                            isAdmin = isAdmin
-                        )
-                        onSave(emp)
-                    }
-                }
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+    }
 
     if (showAddDeptDialog) {
         AlertDialog(
@@ -440,20 +479,24 @@ fun AddEditEmployeeDialog(
                     onValueChange = { newDeptName = it },
                     label = { Text("Department Name") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
-                Button(onClick = {
-                    if (newDeptName.isNotBlank()) {
-                        scope.launch {
-                            departmentDao.insertDepartment(DepartmentEntity(newDeptName.trim()))
-                            department = newDeptName.trim()
-                            newDeptName = ""
-                            showAddDeptDialog = false
+                Button(
+                    onClick = {
+                        if (newDeptName.isNotBlank()) {
+                            scope.launch {
+                                departmentDao.insertDepartment(DepartmentEntity(newDeptName.trim()))
+                                department = newDeptName.trim()
+                                newDeptName = ""
+                                showAddDeptDialog = false
+                            }
                         }
-                    }
-                }) {
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Text("Add")
                 }
             },

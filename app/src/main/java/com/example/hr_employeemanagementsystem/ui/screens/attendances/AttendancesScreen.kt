@@ -165,7 +165,7 @@ fun AttendancesScreen(
                     Text("Face Verified: Yes", style = MaterialTheme.typography.bodyMedium)
 
                     if (log.employeePhotoUri != null) {
-                        Text("Enrolled Profile Photo:", style = MaterialTheme.typography.labelMedium)
+                        Text("Enrolled Profile Photo:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         coil.compose.AsyncImage(
                             model = log.employeePhotoUri,
                             contentDescription = "Enrolled Profile Photo",
@@ -176,6 +176,36 @@ fun AttendancesScreen(
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop
                         )
                         Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (log.capturedPhotoUri != null) {
+                        Text("Check-In Photo:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        coil.compose.AsyncImage(
+                            model = log.capturedPhotoUri,
+                            contentDescription = "Check-In Photo",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (log.checkOutPhotoUri != null) {
+                        Text("Check-Out Photo:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        coil.compose.AsyncImage(
+                            model = log.checkOutPhotoUri,
+                            contentDescription = "Check-Out Photo",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    } else if (log.checkOut == null) {
+                        Text("Check-Out Photo: Shift in progress", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     if (log.checkInLat != null && log.checkInLng != null) {
@@ -226,8 +256,10 @@ fun AttendancesScreen(
                                                                 .title("Check-In Start")
                                                         )
 
-                                                        if (endLat != startLat || endLng != startLng) {
-                                                            val endPoint = org.maplibre.android.geometry.LatLng(endLat, endLng)
+                                                        if (log.checkOutLat != null && log.checkOutLng != null) {
+                                                            val actualEndLat = if (log.checkOutLat == startLat && log.checkOutLng == startLng) log.checkOutLat + 0.0001 else log.checkOutLat
+                                                            val actualEndLng = log.checkOutLng
+                                                            val endPoint = org.maplibre.android.geometry.LatLng(actualEndLat, actualEndLng)
                                                             map.addMarker(
                                                                 org.maplibre.android.annotations.MarkerOptions()
                                                                     .position(endPoint)

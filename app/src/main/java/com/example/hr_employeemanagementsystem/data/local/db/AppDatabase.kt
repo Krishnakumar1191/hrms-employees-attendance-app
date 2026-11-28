@@ -19,7 +19,7 @@ import com.example.hr_employeemanagementsystem.data.model.*
         CompanyEntity::class,
         DepartmentEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

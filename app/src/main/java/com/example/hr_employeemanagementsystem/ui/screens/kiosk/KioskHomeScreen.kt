@@ -20,20 +20,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.core.content.ContextCompat
-import com.example.hr_employeemanagementsystem.data.model.EmployeeEntity
 import com.example.hr_employeemanagementsystem.data.repository.AttendanceRepository
 import com.example.hr_employeemanagementsystem.data.repository.EmployeeRepository
-import com.example.hr_employeemanagementsystem.ml.EmbeddingUtils
 import com.example.hr_employeemanagementsystem.ml.FaceDetectorManager
 import com.example.hr_employeemanagementsystem.ml.FaceMatcher
 import com.example.hr_employeemanagementsystem.ml.FaceNetModel
@@ -58,7 +53,6 @@ fun KioskHomeScreen(
 
     var recognizedMessage by remember { mutableStateOf("Position face inside the frame") }
     var isProcessing by remember { mutableStateOf(false) }
-    var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
 
     val faceMatcher = remember { FaceMatcher() }
     val faceNet = remember { FaceNetModel(context) }
@@ -66,8 +60,29 @@ fun KioskHomeScreen(
     
     // Per-employee cooldown map (employeeId -> last action timestamp)
     val lastActionMap = remember { mutableStateOf<Map<Long, Long>>(emptyMap()) }
-    // Debounce timestamp for error messages to prevent continuous spamming
     val lastErrorTime = remember { mutableStateOf(0L) }
+    var showLocationAlert by remember { mutableStateOf(false) }
+
+    if (showLocationAlert) {
+        AlertDialog(
+            onDismissRequest = { showLocationAlert = false },
+            title = { Text("Location Services Disabled") },
+            text = { Text("Please enable device location services (GPS) in your phone settings to check in and check out.") },
+            confirmButton = {
+                Button(onClick = {
+                    showLocationAlert = false
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                }) {
+                    Text("Enable Location")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocationAlert = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     LaunchedEffect(enrolledEmployees.size) {
         if (enrolledEmployees.isEmpty()) {
@@ -109,82 +124,54 @@ fun KioskHomeScreen(
 
                                             val matchedEmp = faceMatcher.matchFace(liveEmbedding, enrolledEmployeesState.value)
 
-                                            android.util.Log.d("FaceKiosk", "Extracted Live Embedding: ${liveEmbedding.take(5)}...")
-                                            android.util.Log.d("FaceKiosk", "Found matchedEmp: ${matchedEmp?.displayName}")
-
                                             if (matchedEmp != null) {
-                                                val lastAction = lastActionMap.value[matchedEmp.id] ?: 0L
-                                                val currentTime = System.currentTimeMillis()
-                                                val personCooldownMs = 15 * 1000L // 15 seconds cooldown per employee
-
-                                                if (currentTime - lastAction < personCooldownMs) {
-                                                    // Same person standing still, ignore to prevent accidental re-trigger
+                                                if (!isLocationEnabled(context)) {
+                                                    showLocationAlert = true
                                                     isProcessing = false
                                                     return@FaceDetectorManager
                                                 }
 
-                                                // Update last action timestamp
+                                                val lastAction = lastActionMap.value[matchedEmp.id] ?: 0L
+                                                val currentTime = System.currentTimeMillis()
+                                                val personCooldownMs = 3 * 1000L
+
+                                                if (currentTime - lastAction < personCooldownMs) {
+                                                    isProcessing = false
+                                                    return@FaceDetectorManager
+                                                }
+
                                                 lastActionMap.value = lastActionMap.value + (matchedEmp.id to currentTime)
 
                                                 scope.launch {
+                                                    var photoUri: String? = null
+                                                    val file = java.io.File(context.filesDir, "attendance_${matchedEmp.id}_${System.currentTimeMillis()}.jpg")
+                                                    try {
+                                                        var left = boundingBox.left.coerceAtLeast(0)
+                                                        var top = boundingBox.top.coerceAtLeast(0)
+                                                        var right = boundingBox.right.coerceAtMost(bitmap.width)
+                                                        var bottom = boundingBox.bottom.coerceAtMost(bitmap.height)
+
+                                                        val w = right - left
+                                                        val h = bottom - top
+                                                        left = (left - w * 0.2f).toInt().coerceAtLeast(0)
+                                                        top = (top - h * 0.2f).toInt().coerceAtLeast(0)
+                                                        right = (right + w * 0.2f).toInt().coerceAtMost(bitmap.width)
+                                                        bottom = (bottom + h * 0.2f).toInt().coerceAtMost(bitmap.height)
+
+                                                        val faceCrop = android.graphics.Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
+
+                                                        java.io.FileOutputStream(file).use { out ->
+                                                            faceCrop.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                                        }
+                                                        photoUri = file.absolutePath
+                                                    } catch (e: Exception) {
+                                                        android.util.Log.e("FaceKiosk", "Error saving face crop photo", e)
+                                                    }
+
                                                     val activeAttendance = attendanceRepository.getActiveAttendance(matchedEmp.id)
 
                                                     if (activeAttendance == null) {
-                                                        var photoUri: String? = null
-                                                        val file = java.io.File(context.filesDir, "attendance_${matchedEmp.id}_${System.currentTimeMillis()}.jpg")
-                                                        try {
-                                                            var left = boundingBox.left.coerceAtLeast(0)
-                                                            var top = boundingBox.top.coerceAtLeast(0)
-                                                            var right = boundingBox.right.coerceAtMost(bitmap.width)
-                                                            var bottom = boundingBox.bottom.coerceAtMost(bitmap.height)
-
-                                                            val w = right - left
-                                                            val h = bottom - top
-                                                            left = (left - w * 0.2f).toInt().coerceAtLeast(0)
-                                                            top = (top - h * 0.2f).toInt().coerceAtLeast(0)
-                                                            right = (right + w * 0.2f).toInt().coerceAtMost(bitmap.width)
-                                                            bottom = (bottom + h * 0.2f).toInt().coerceAtMost(bitmap.height)
-
-                                                            val faceCrop = android.graphics.Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
-
-                                                            java.io.FileOutputStream(file).use { out ->
-                                                                faceCrop.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
-                                                            }
-                                                            photoUri = file.absolutePath
-                                                        } catch (e: Exception) {
-                                                            android.util.Log.e("FaceKiosk", "Error saving face crop photo", e)
-                                                        }
-
-                                                        // Fetch real device location dynamically using high accuracy
-                                                        val (lat, lng) = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
-                                                            try {
-                                                                val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                                                                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
-                                                                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                                                    
-                                                                    val request = com.google.android.gms.location.CurrentLocationRequest.Builder()
-                                                                        .setPriority(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY)
-                                                                        .setMaxUpdateAgeMillis(10000)
-                                                                        .build()
-
-                                                                    fusedLocationClient.getCurrentLocation(request, null).addOnSuccessListener { location ->
-                                                                        if (location != null) {
-                                                                            continuation.resumeWith(Result.success(Pair(location.latitude, location.longitude)))
-                                                                        } else {
-                                                                            // Fallback to Coimbatore coordinates (11.0168, 76.9558)
-                                                                            continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                        }
-                                                                    }.addOnFailureListener {
-                                                                        continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                    }
-                                                                } else {
-                                                                    continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                }
-                                                            } catch (e: Exception) {
-                                                                continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                            }
-                                                        }
-
+                                                        val (lat, lng) = fetchInstantGpsLocation(context)
                                                         attendanceRepository.clockIn(matchedEmp.id, matchedEmp.displayName, photoUri, matchedEmp.photoUri, lat, lng)
                                                         if (matchedEmp.trackEmployee) {
                                                             LocationTrackingService.startTracking(context, matchedEmp.id)
@@ -195,40 +182,12 @@ fun KioskHomeScreen(
                                                         val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
                                                         val checkInTime = try { format.parse(activeAttendance.checkIn)?.time ?: 0L } catch(e: Exception) { 0L }
 
-                                                        val cooldownMs = 60 * 1000L
+                                                        val cooldownMs = 15 * 1000L
                                                         if (currentTime - checkInTime < cooldownMs) {
-                                                            recognizedMessage = "⏳ Wait 1 min to Check Out, ${matchedEmp.displayName}"
+                                                            recognizedMessage = "⏳ Wait a moment to Check Out, ${matchedEmp.displayName}"
                                                         } else {
-                                                            // Fetch real device location dynamically for check-out
-                                                            val (outLat, outLng) = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
-                                                                try {
-                                                                    val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                                                                    if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
-                                                                        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                                                        
-                                                                        val request = com.google.android.gms.location.CurrentLocationRequest.Builder()
-                                                                            .setPriority(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY)
-                                                                            .setMaxUpdateAgeMillis(10000)
-                                                                            .build()
-
-                                                                        fusedLocationClient.getCurrentLocation(request, null).addOnSuccessListener { location ->
-                                                                            if (location != null) {
-                                                                                continuation.resumeWith(Result.success(Pair(location.latitude, location.longitude)))
-                                                                            } else {
-                                                                                continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                            }
-                                                                        }.addOnFailureListener {
-                                                                            continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                        }
-                                                                    } else {
-                                                                        continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                    }
-                                                                } catch (e: Exception) {
-                                                                    continuation.resumeWith(Result.success(Pair(11.0168, 76.9558)))
-                                                                }
-                                                            }
-
-                                                            attendanceRepository.clockOut(activeAttendance, outLat, outLng)
+                                                            val (outLat, outLng) = fetchInstantGpsLocation(context)
+                                                            attendanceRepository.clockOut(activeAttendance, outLat, outLng, photoUri)
                                                             if (matchedEmp.trackEmployee) {
                                                                 LocationTrackingService.stopTracking(context)
                                                             }
@@ -237,24 +196,19 @@ fun KioskHomeScreen(
                                                         }
                                                     }
 
-                                                    kotlinx.coroutines.delay(2500)
+                                                    kotlinx.coroutines.delay(1000)
                                                     recognizedMessage = "Position face inside the frame"
                                                     isProcessing = false
                                                 }
                                             } else {
                                                 val currentTime = System.currentTimeMillis()
-                                                if (currentTime - lastErrorTime.value > 3000L) {
+                                                if (currentTime - lastErrorTime.value > 2000L) {
                                                     lastErrorTime.value = currentTime
                                                     val hasUnenrolledStaff = allEmployeesState.value.any { !it.isEnrolled || it.faceDescriptor.isNullOrEmpty() }
-                                                    
-                                                    if (hasUnenrolledStaff) {
-                                                        recognizedMessage = "❌ You are not enrolled, please enroll."
-                                                    } else {
-                                                        recognizedMessage = "❌ You are not an employee for this organization."
-                                                    }
+                                                    recognizedMessage = if (hasUnenrolledStaff) "❌ You are not enrolled, please enroll." else "❌ Face not recognized."
                                                     
                                                     scope.launch {
-                                                        kotlinx.coroutines.delay(2500)
+                                                        kotlinx.coroutines.delay(1000)
                                                         recognizedMessage = "Position face inside the frame"
                                                         isProcessing = false
                                                     }
@@ -277,125 +231,62 @@ fun KioskHomeScreen(
                         }
 
                     val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            imageAnalyzer
+                        )
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        android.util.Log.e("FaceKiosk", "Camera binding failed", e)
                     }
                 }, ContextCompat.getMainExecutor(ctx))
 
-                previewViewRef = previewView
                 previewView
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Full-screen camera overlay layout
+        // Overlay Guide Frame / Scanner Box Mask with Dynamic Glowing Border (Blue when waiting, Green when processing)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasWidth = size.width
             val canvasHeight = size.height
-            
-            val centerX = canvasWidth / 2
-            val centerY = canvasHeight / 2 - 150f // slightly higher
-            val radius = canvasWidth * 0.45f // Made circle much larger
-            
-            with(drawContext.canvas.nativeCanvas) {
-                val checkPoint = saveLayer(null, null)
-                
-                // Dark background
-                drawRect(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    size = androidx.compose.ui.geometry.Size(canvasWidth, canvasHeight)
-                )
-                
-                // Clear the circle area
-                drawCircle(
-                    color = Color.Transparent,
-                    radius = radius,
-                    center = androidx.compose.ui.geometry.Offset(centerX, centerY),
-                    blendMode = BlendMode.Clear
-                )
-                
-                val lineLength = 80f // Longer corner brackets
-                val strokeWidth = 10f // Thicker corner brackets
-                val cornerColor = if (isProcessing) Color.Green else Color(0xFF64B5F6)
-                
-                // Top Left
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY - radius + lineLength),
-                    end = androidx.compose.ui.geometry.Offset(centerX - radius, centerY - radius),
-                    strokeWidth = strokeWidth
-                )
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY - radius),
-                    end = androidx.compose.ui.geometry.Offset(centerX - radius + lineLength, centerY - radius),
-                    strokeWidth = strokeWidth
-                )
-                
-                // Top Right
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX + radius - lineLength, centerY - radius),
-                    end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY - radius),
-                    strokeWidth = strokeWidth
-                )
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX + radius, centerY - radius),
-                    end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY - radius + lineLength),
-                    strokeWidth = strokeWidth
-                )
-                
-                // Bottom Left
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY + radius - lineLength),
-                    end = androidx.compose.ui.geometry.Offset(centerX - radius, centerY + radius),
-                    strokeWidth = strokeWidth
-                )
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX - radius, centerY + radius),
-                    end = androidx.compose.ui.geometry.Offset(centerX - radius + lineLength, centerY + radius),
-                    strokeWidth = strokeWidth
-                )
-                
-                // Bottom Right
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX + radius - lineLength, centerY + radius),
-                    end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY + radius),
-                    strokeWidth = strokeWidth
-                )
-                drawLine(
-                    color = cornerColor,
-                    start = androidx.compose.ui.geometry.Offset(centerX + radius, centerY + radius),
-                    end = androidx.compose.ui.geometry.Offset(centerX + radius, centerY + radius - lineLength),
-                    strokeWidth = strokeWidth
-                )
-                
-                // Center horizontal guide line
-                drawLine(
-                    color = cornerColor.copy(alpha = 0.5f),
-                    start = androidx.compose.ui.geometry.Offset(centerX - radius - 20f, centerY),
-                    end = androidx.compose.ui.geometry.Offset(centerX + radius + 20f, centerY),
-                    strokeWidth = 3f
-                )
+            val boxWidth = canvasWidth * 0.7f
+            val boxHeight = boxWidth * 1.3f
+            val left = (canvasWidth - boxWidth) / 2f
+            val top = (canvasHeight - boxHeight) / 2f
 
-                restoreToCount(checkPoint)
-            }
+            drawRect(
+                color = Color.Black.copy(alpha = 0.5f),
+                size = size
+            )
+
+            drawRect(
+                color = Color.Transparent,
+                topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                size = androidx.compose.ui.geometry.Size(boxWidth, boxHeight),
+                blendMode = BlendMode.Clear
+            )
+
+            val frameColor = if (isProcessing) Color(0xFF22C55E) else Color(0xFF38BDF8)
+
+            drawRect(
+                color = frameColor,
+                topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                size = androidx.compose.ui.geometry.Size(boxWidth, boxHeight),
+                style = Stroke(width = 6f)
+            )
         }
 
-        // Top Status Bar
+        // Top Bar Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp)
                 .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -452,5 +343,37 @@ fun KioskHomeScreen(
                 )
             }
         }
+    }
+}
+
+fun isLocationEnabled(context: android.content.Context): Boolean {
+    val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+    return lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+           lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+}
+
+suspend fun fetchInstantGpsLocation(context: android.content.Context): Pair<Double, Double> = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+    try {
+        val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+        val rsPuramLat = 11.0051 // Exact RS Puram office fallback
+        val rsPuramLng = 76.9511
+
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+
+            fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
+                if (lastLoc != null) {
+                    continuation.resumeWith(Result.success(Pair(lastLoc.latitude, lastLoc.longitude)))
+                } else {
+                    continuation.resumeWith(Result.success(Pair(rsPuramLat, rsPuramLng)))
+                }
+            }.addOnFailureListener {
+                continuation.resumeWith(Result.success(Pair(rsPuramLat, rsPuramLng)))
+            }
+        } else {
+            continuation.resumeWith(Result.success(Pair(rsPuramLat, rsPuramLng)))
+        }
+    } catch (e: Exception) {
+        continuation.resumeWith(Result.success(Pair(11.0051, 76.9511)))
     }
 }
